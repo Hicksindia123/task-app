@@ -7,32 +7,27 @@ on:
       - master
   workflow_dispatch:
 
-# Set permissions for GitHub Pages and branch deployment
 permissions:
   contents: write
   pages: write
   id-token: write
 
-# Allow one concurrent deployment to prevent race conditions
 concurrency:
   group: 'pages'
   cancel-in-progress: false
 
 jobs:
   build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -40,33 +35,35 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run Test Suite
-        working-directory: frontend
-        run: npm test
-
       - name: Build Production Frontend
         working-directory: frontend
         run: npm run build
         env:
           VITE_BASE_PATH: /task-app/
 
+      - name: Run Test Suite
+        working-directory: frontend
+        run: npm test
+
       - name: Configure SPA 404 Fallback
         run: cp frontend/dist/index.html frontend/dist/404.html
 
-      # 1. Official GitHub Pages Deployment (Actions workflow source)
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      # 2. Deploy to gh-pages branch (Fail-safe for branch-based Pages hosting)
+      # 1. Deploy to gh-pages Branch (Robust and standard branch deployment)
       - name: Deploy to gh-pages Branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
           folder: frontend/dist
           clean: true
+
+      # 2. Upload and Deploy via GitHub Pages Actions (if Actions is enabled as Pages source)
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
+        with:
+          path: frontend/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
